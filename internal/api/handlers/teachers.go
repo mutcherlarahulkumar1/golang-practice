@@ -9,32 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 )
-
-var (
-	teachers = make(map[int]models.Teacher)
-	mutex    = &sync.Mutex{}
-	nextID   = 1
-)
-
-func init() {
-	teachers[nextID] = models.Teacher{
-		ID:        nextID,
-		FirstName: "John",
-		LastName:  "Doe",
-		Class:     "2",
-		Subject:   "Chemistry",
-	}
-	nextID++
-	teachers[nextID] = models.Teacher{
-		ID:        nextID,
-		FirstName: "Jane",
-		LastName:  "Smith",
-		Class:     "10 A",
-		Subject:   "Algebra",
-	}
-}
 
 func TeachersHandler(writer http.ResponseWriter, request *http.Request) {
 	fmt.Println("Hello Teachers Route")
@@ -71,16 +46,12 @@ func getTeachersHandler(writer http.ResponseWriter, request *http.Request) {
 	teacherID := strings.TrimSuffix(path, "/")
 	if teacherID == "" {
 		teachersList := make([]models.Teacher, 0)
-		lastName := request.URL.Query().Get("lastname")
 
 		var args []any
 
 		query := "SELECT id,firstName,lastName,email,class,subject FROM teachers WHERE 1=1"
 
-		if lastName != "" {
-			query += " AND lastName = $1"
-			args = append(args, lastName)
-		}
+		query, args = addFilters(request, query, args)
 
 		var rows, err = db.Query(query, args...)
 		if err != nil {
@@ -109,6 +80,7 @@ func getTeachersHandler(writer http.ResponseWriter, request *http.Request) {
 			Data:   teachersList,
 		}
 		json.NewEncoder(writer).Encode(response)
+		return
 	}
 	id, err := strconv.Atoi(teacherID)
 	if err != nil {
@@ -128,6 +100,27 @@ func getTeachersHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 	json.NewEncoder(writer).Encode(teacher)
 
+}
+
+func addFilters(request *http.Request, query string, args []any) (string, []any) {
+	params := map[string]string{
+		"firstname": "firstName",
+		"lastname":  "lastName",
+		"email":     "email",
+		"class":     "class",
+		"subject":   "subject",
+	}
+
+	i := 1
+	for param, dbField := range params {
+		value := request.URL.Query().Get(param)
+		if value != "" {
+			query += fmt.Sprintf(" AND %s = $%d", dbField, i)
+			args = append(args, value)
+			i++
+		}
+	}
+	return query, args
 }
 
 func addTeachersHandler(writer http.ResponseWriter, request *http.Request) {

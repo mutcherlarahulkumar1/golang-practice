@@ -11,29 +11,56 @@ import (
 	"strings"
 )
 
-func TeachersHandler(writer http.ResponseWriter, request *http.Request) {
-	fmt.Println("Hello Teachers Route")
-
-	switch request.Method {
-	case http.MethodGet:
-		getTeachersHandler(writer, request)
-
-	case http.MethodPost:
-		addTeachersHandler(writer, request)
-
-	case http.MethodPut:
-		updateTeacherHandler(writer, request)
-
-	case http.MethodPatch:
-		patchTeacherHandler(writer, request)
-
-	case http.MethodDelete:
-		writer.Write([]byte("THis DELETE Call for teachers"))
+func GetTeachersHandler(writer http.ResponseWriter, request *http.Request) {
+	db, err := sqlconnect.ConnectToDB()
+	if err != nil {
+		http.Error(writer, "Error Connecting DB", http.StatusBadGateway)
+		return
 	}
+	defer db.Close()
+
+	teachersList := make([]models.Teacher, 0)
+
+	var args []any
+
+	query := "SELECT id,firstName,lastName,email,class,subject FROM teachers WHERE 1=1"
+
+	// Adding filters and sort params
+	query, args = addFilters(request, query, args)
+	query = addSortParams(request, query)
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		http.Error(writer, "Cannot Get Items From DB", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var teacher models.Teacher
+		err := rows.Scan(&teacher.ID, &teacher.FirstName, &teacher.LastName, &teacher.Email, &teacher.Class, &teacher.Subject)
+		if err != nil {
+			http.Error(writer, "Cannot Get Items From DB", http.StatusNotFound)
+			return
+		}
+		teachersList = append(teachersList, teacher)
+	}
+
+	response := struct {
+		Status string           `json:"status"`
+		Count  int              `json:"count"`
+		Data   []models.Teacher `json:"data"`
+	}{
+		Status: "Success",
+		Count:  len(teachersList),
+		Data:   teachersList,
+	}
+	json.NewEncoder(writer).Encode(response)
+	return
 
 }
 
-func getTeachersHandler(writer http.ResponseWriter, request *http.Request) {
+func GetTeacherHandler(writer http.ResponseWriter, request *http.Request) {
 
 	db, err := sqlconnect.ConnectToDB()
 	if err != nil {
@@ -43,46 +70,6 @@ func getTeachersHandler(writer http.ResponseWriter, request *http.Request) {
 	defer db.Close()
 
 	teacherID := extractTeacherID(request)
-	if teacherID == -1 {
-		teachersList := make([]models.Teacher, 0)
-
-		var args []any
-
-		query := "SELECT id,firstName,lastName,email,class,subject FROM teachers WHERE 1=1"
-
-		// Adding filters and sort params
-		query, args = addFilters(request, query, args)
-		query = addSortParams(request, query)
-
-		var rows, err = db.Query(query, args...)
-		if err != nil {
-			http.Error(writer, "Cannot Get Items From DB", http.StatusNotFound)
-			return
-		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var teacher models.Teacher
-			err := rows.Scan(&teacher.ID, &teacher.FirstName, &teacher.LastName, &teacher.Email, &teacher.Class, &teacher.Subject)
-			if err != nil {
-				http.Error(writer, "Cannot Get Items From DB", http.StatusNotFound)
-				return
-			}
-			teachersList = append(teachersList, teacher)
-		}
-
-		response := struct {
-			Status string           `json:"status"`
-			Count  int              `json:"count"`
-			Data   []models.Teacher `json:"data"`
-		}{
-			Status: "Success",
-			Count:  len(teachersList),
-			Data:   teachersList,
-		}
-		json.NewEncoder(writer).Encode(response)
-		return
-	}
 
 	var teacher models.Teacher
 	err = db.QueryRow("SELECT id,firstName,lastName,email,class,subject FROM teachers WHERE id=$1", teacherID).Scan(&teacher.ID, &teacher.FirstName, &teacher.LastName, &teacher.Email, &teacher.Class, &teacher.Subject)
@@ -99,8 +86,7 @@ func getTeachersHandler(writer http.ResponseWriter, request *http.Request) {
 }
 
 func extractTeacherID(request *http.Request) int {
-	path := strings.TrimPrefix(request.URL.Path, "/teachers/")
-	teacherID := strings.TrimSuffix(path, "/")
+	teacherID := request.PathValue("id")
 	id, err := strconv.Atoi(teacherID)
 	if err != nil {
 		return -1
@@ -147,7 +133,7 @@ func addFilters(request *http.Request, query string, args []any) (string, []any)
 	return query, args
 }
 
-func addTeachersHandler(writer http.ResponseWriter, request *http.Request) {
+func AddTeachersHandler(writer http.ResponseWriter, request *http.Request) {
 	db, err := sqlconnect.ConnectToDB()
 	if err != nil {
 		http.Error(writer, "Error Connecting DB", http.StatusBadGateway)
@@ -197,7 +183,7 @@ func addTeachersHandler(writer http.ResponseWriter, request *http.Request) {
 }
 
 // PUT METHOD ->Updating the complete entry
-func updateTeacherHandler(writer http.ResponseWriter, request *http.Request) {
+func UpdateTeacherHandler(writer http.ResponseWriter, request *http.Request) {
 	teacherID := extractTeacherID(request)
 	if teacherID == -1 {
 		http.Error(writer, "Invalid ID", http.StatusBadRequest)
@@ -241,7 +227,7 @@ func updateTeacherHandler(writer http.ResponseWriter, request *http.Request) {
 	json.NewEncoder(writer).Encode(updatedTeacher)
 }
 
-func patchTeacherHandler(writer http.ResponseWriter, request *http.Request) {
+func PatchTeacherHandler(writer http.ResponseWriter, request *http.Request) {
 	teacherID := extractTeacherID(request)
 	if teacherID == -1 {
 		http.Error(writer, "Invalid ID", http.StatusBadRequest)
@@ -283,7 +269,7 @@ func patchTeacherHandler(writer http.ResponseWriter, request *http.Request) {
 			existingTeacher.LastName = v.(string)
 
 		case "class":
-			existingTeacher.FirstName = v.(string)
+			existingTeacher.Class = v.(string)
 
 		case "subject":
 			existingTeacher.Subject = v.(string)

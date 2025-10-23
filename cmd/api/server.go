@@ -32,10 +32,14 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", rootHandler)
-
 	mux.HandleFunc("/anotherWay", anotherRootHandler)
 
-	mux.HandleFunc("/teachers/", handlers.TeachersHandler)
+	mux.HandleFunc("GET /teachers/", handlers.GetTeachersHandler)
+	mux.HandleFunc("POST /teachers/", handlers.AddTeachersHandler)
+	mux.HandleFunc("PUT /teachers/", handlers.UpdateTeacherHandler)
+	mux.HandleFunc("PATCH /teachers/", handlers.PatchTeacherHandler)
+
+	mux.HandleFunc("GET /teachers/{id}", handlers.GetTeacherHandler)
 
 	mux.HandleFunc("/students/", handlers.StudentsHanlder)
 

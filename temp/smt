@@ -1,0 +1,46 @@
+package temp
+
+//
+//case http.MethodPost:
+// for url-encoded form
+// first parse and see if any error
+//err := request.ParseForm()
+//if err != nil {
+//	http.Error(writer, "Error Parsing the form", http.StatusBadRequest)
+//	return
+//}
+//fmt.Println(request.Form)
+
+// For RAW BODY Processing (JSON)
+//
+//body, err := io.ReadAll(request.Body)
+//if err != nil {
+//http.Error(writer, "Error reading data", http.StatusBadRequest)
+//return
+//}
+//defer request.Body.Close()
+//fmt.Println("RAW Body : ", string(body))
+//var u1 User
+//err = json.Unmarshal(body, &u1)
+//if err != nil {
+//http.Error(writer, "Error reading data", http.StatusBadRequest)
+//return
+//}
+//fmt.Println(u1.Age)
+//writer.Write([]byte("THis POST Call for teachers"))
+
+
+
+// PATH PARAMS
+	path := strings.TrimPrefix(request.URL.Path, "/teachers/")
+	userID := strings.TrimSuffix(path, "/")
+	fmt.Println("User ID : ", userID)
+
+	// QUERY PARAMS
+	queryParams := request.URL.Query()
+	fmt.Println(queryParams)
+
+	limit := queryParams.Get("limit")
+	page := queryParams.Get("page")
+
+	fmt.Println("Query Params : ", limit, page)

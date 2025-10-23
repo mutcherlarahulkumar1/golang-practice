@@ -25,7 +25,7 @@ func TeachersHandler(writer http.ResponseWriter, request *http.Request) {
 		updateTeacherHandler(writer, request)
 
 	case http.MethodPatch:
-		writer.Write([]byte("THis PATCH Call for teachers"))
+		patchTeacherHandler(writer, request)
 
 	case http.MethodDelete:
 		writer.Write([]byte("THis DELETE Call for teachers"))
@@ -239,4 +239,68 @@ func updateTeacherHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	json.NewEncoder(writer).Encode(updatedTeacher)
+}
+
+func patchTeacherHandler(writer http.ResponseWriter, request *http.Request) {
+	teacherID := extractTeacherID(request)
+	if teacherID == -1 {
+		http.Error(writer, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+	var updates map[string]interface{}
+
+	err := json.NewDecoder(request.Body).Decode(&updates)
+	if err != nil {
+		http.Error(writer, "Invalid BOdy Format", http.StatusBadRequest)
+		return
+	}
+
+	db, err := sqlconnect.ConnectToDB()
+	if err != nil {
+		http.Error(writer, "DB Error", http.StatusInternalServerError)
+		return
+	}
+	defer db.Close()
+
+	var existingTeacher models.Teacher
+
+	err = db.QueryRow("SELECT id,firstName,lastName,email,class,subject FROM teachers WHERE id=$1", teacherID).Scan(&existingTeacher.ID, &existingTeacher.FirstName, &existingTeacher.LastName, &existingTeacher.Email, &existingTeacher.Class, &existingTeacher.Subject)
+	if err == sql.ErrNoRows {
+		http.Error(writer, "No Data Found for requested ID", http.StatusFound)
+		return
+	}
+	if err != nil {
+		http.Error(writer, "Cannot Get Items From DB", http.StatusNotFound)
+		return
+	}
+
+	for k, v := range updates {
+		switch k {
+		case "firstName":
+			existingTeacher.FirstName = v.(string)
+
+		case "lastName":
+			existingTeacher.LastName = v.(string)
+
+		case "class":
+			existingTeacher.FirstName = v.(string)
+
+		case "subject":
+			existingTeacher.Subject = v.(string)
+
+		case "email":
+			existingTeacher.Email = v.(string)
+
+		}
+
+	}
+
+	_, err = db.Exec("UPDATE teachers SET firstName = $1, lastName = $2, email = $3, class = $4, subject = $5 where id = $6", existingTeacher.FirstName, existingTeacher.LastName, existingTeacher.Email, existingTeacher.Class, existingTeacher.Subject, teacherID)
+	if err != nil {
+		http.Error(writer, "Error From DB", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(writer).Encode(existingTeacher)
+
 }

@@ -22,7 +22,7 @@ func TeachersHandler(writer http.ResponseWriter, request *http.Request) {
 		addTeachersHandler(writer, request)
 
 	case http.MethodPut:
-		writer.Write([]byte("THis PUT Call for teachers"))
+		updateTeacherHandler(writer, request)
 
 	case http.MethodPatch:
 		writer.Write([]byte("THis PATCH Call for teachers"))
@@ -42,16 +42,17 @@ func getTeachersHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 	defer db.Close()
 
-	path := strings.TrimPrefix(request.URL.Path, "/teachers/")
-	teacherID := strings.TrimSuffix(path, "/")
-	if teacherID == "" {
+	teacherID := extractTeacherID(request)
+	if teacherID == -1 {
 		teachersList := make([]models.Teacher, 0)
 
 		var args []any
 
 		query := "SELECT id,firstName,lastName,email,class,subject FROM teachers WHERE 1=1"
 
+		// Adding filters and sort params
 		query, args = addFilters(request, query, args)
+		query = addSortParams(request, query)
 
 		var rows, err = db.Query(query, args...)
 		if err != nil {
@@ -82,14 +83,9 @@ func getTeachersHandler(writer http.ResponseWriter, request *http.Request) {
 		json.NewEncoder(writer).Encode(response)
 		return
 	}
-	id, err := strconv.Atoi(teacherID)
-	if err != nil {
-		http.Error(writer, "Invalid ID Format", http.StatusNotFound)
-		return
-	}
 
 	var teacher models.Teacher
-	err = db.QueryRow("SELECT id,firstName,lastName,email,class,subject FROM teachers WHERE id=$1", id).Scan(&teacher.ID, &teacher.FirstName, &teacher.LastName, &teacher.Email, &teacher.Class, &teacher.Subject)
+	err = db.QueryRow("SELECT id,firstName,lastName,email,class,subject FROM teachers WHERE id=$1", teacherID).Scan(&teacher.ID, &teacher.FirstName, &teacher.LastName, &teacher.Email, &teacher.Class, &teacher.Subject)
 	if err == sql.ErrNoRows {
 		http.Error(writer, "No Data Found for requested ID", http.StatusFound)
 		return
@@ -100,6 +96,34 @@ func getTeachersHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 	json.NewEncoder(writer).Encode(teacher)
 
+}
+
+func extractTeacherID(request *http.Request) int {
+	path := strings.TrimPrefix(request.URL.Path, "/teachers/")
+	teacherID := strings.TrimSuffix(path, "/")
+	id, err := strconv.Atoi(teacherID)
+	if err != nil {
+		return -1
+	}
+	return id
+}
+
+func addSortParams(request *http.Request, query string) string {
+	sortParams := request.URL.Query()["sortby"]
+	if len(sortParams) > 0 {
+		query += " ORDER BY "
+		for i, param := range sortParams {
+			parts := strings.Split(param, ":")
+
+			field, order := parts[0], parts[1]
+			if i > 0 {
+				query += ","
+			}
+			query += " " + field + " " + order
+		}
+
+	}
+	return query
 }
 
 func addFilters(request *http.Request, query string, args []any) (string, []any) {
@@ -170,4 +194,49 @@ func addTeachersHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 	json.NewEncoder(writer).Encode(resp)
 	return
+}
+
+// PUT METHOD ->Updating the complete entry
+func updateTeacherHandler(writer http.ResponseWriter, request *http.Request) {
+	teacherID := extractTeacherID(request)
+	if teacherID == -1 {
+		http.Error(writer, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+	var updatedTeacher models.Teacher
+
+	err := json.NewDecoder(request.Body).Decode(&updatedTeacher)
+	if err != nil {
+		http.Error(writer, "Invalid BOdy Format", http.StatusBadRequest)
+		return
+	}
+
+	db, err := sqlconnect.ConnectToDB()
+	if err != nil {
+		http.Error(writer, "DB Error", http.StatusInternalServerError)
+		return
+	}
+	defer db.Close()
+
+	var existingTeacher models.Teacher
+
+	err = db.QueryRow("SELECT id,firstName,lastName,email,class,subject FROM teachers WHERE id=$1", teacherID).Scan(&existingTeacher.ID, &existingTeacher.FirstName, &existingTeacher.LastName, &existingTeacher.Email, &existingTeacher.Class, &existingTeacher.Subject)
+	if err == sql.ErrNoRows {
+		http.Error(writer, "No Data Found for requested ID", http.StatusFound)
+		return
+	}
+	if err != nil {
+		http.Error(writer, "Cannot Get Items From DB", http.StatusNotFound)
+		return
+	}
+
+	updatedTeacher.ID = existingTeacher.ID
+
+	_, err = db.Exec("UPDATE teachers SET firstName = $1, lastName = $2, email = $3, class = $4, subject = $5 where id = $6", updatedTeacher.FirstName, updatedTeacher.LastName, updatedTeacher.Email, updatedTeacher.Class, updatedTeacher.Subject, teacherID)
+	if err != nil {
+		http.Error(writer, "Error From DB", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(writer).Encode(updatedTeacher)
 }

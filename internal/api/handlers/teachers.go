@@ -237,7 +237,7 @@ func PatchTeacherHandler(writer http.ResponseWriter, request *http.Request) {
 
 	err := json.NewDecoder(request.Body).Decode(&updates)
 	if err != nil {
-		http.Error(writer, "Invalid BOdy Format", http.StatusBadRequest)
+		http.Error(writer, "Invalid Body Format", http.StatusBadRequest)
 		return
 	}
 
@@ -289,4 +289,56 @@ func PatchTeacherHandler(writer http.ResponseWriter, request *http.Request) {
 
 	json.NewEncoder(writer).Encode(existingTeacher)
 
+}
+
+func GetStudentsByTeacherID(writer http.ResponseWriter, request *http.Request) {
+	teacherID, err := strconv.Atoi(request.PathValue("id"))
+	if err != nil {
+		http.Error(writer, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	var students []models.Student
+
+	db, err := sqlconnect.ConnectToDB()
+	if err != nil {
+		http.Error(writer, "Error Connecting DB", http.StatusBadGateway)
+		return
+	}
+	defer db.Close()
+
+	query := `SELECT id,firstName,lastName,class,email FROM students WHERE class = (SELECT class FROM teachers WHERE id = $1)`
+
+	rows, err := db.Query(query, teacherID)
+	if err != nil {
+		http.Error(writer, "Error Processing DB Req", http.StatusBadGateway)
+		return
+	}
+
+	for rows.Next() {
+		var student models.Student
+		err := rows.Scan(&student.ID, &student.FirstName, &student.LastName, &student.Email, &student.Class)
+		if err != nil {
+			http.Error(writer, "Error Converting Rows", http.StatusBadGateway)
+			return
+		}
+		students = append(students, student)
+	}
+	err = rows.Err()
+	if err != nil {
+		http.Error(writer, "Error Scanning Rows", http.StatusBadGateway)
+		return
+	}
+
+	res := struct {
+		Status string           `json:"status"`
+		Count  int              `json:"count"`
+		Data   []models.Student `json:"data"`
+	}{
+		Status: "Success",
+		Count:  len(students),
+		Data:   students,
+	}
+
+	json.NewEncoder(writer).Encode(res)
 }

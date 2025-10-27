@@ -12,6 +12,7 @@ var allowedOrigin = []string{
 func Cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		origin := request.Header.Get("Origin")
+
 		if !isOriginAllowed(origin) {
 			http.Error(writer, "Request Blocked By CORS", http.StatusForbidden)
 			return

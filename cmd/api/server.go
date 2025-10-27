@@ -34,16 +34,22 @@ func main() {
 	mux.HandleFunc("/", rootHandler)
 	mux.HandleFunc("/anotherWay", anotherRootHandler)
 
-	mux.HandleFunc("GET /teachers/", handlers.GetTeachersHandler)
-	mux.HandleFunc("POST /teachers/", handlers.AddTeachersHandler)
-	mux.HandleFunc("PUT /teachers/", handlers.UpdateTeacherHandler)
-	mux.HandleFunc("PATCH /teachers/", handlers.PatchTeacherHandler)
+	mux.HandleFunc("GET /teachers", handlers.GetTeachersHandler)
+	mux.HandleFunc("POST /teachers", handlers.AddTeachersHandler) // Need to send in []
 
 	mux.HandleFunc("GET /teachers/{id}", handlers.GetTeacherHandler)
+	mux.HandleFunc("PUT /teachers/{id}", handlers.UpdateTeacherHandler)
+	mux.HandleFunc("PATCH /teachers/{id}", handlers.PatchTeacherHandler)
 
-	mux.HandleFunc("/students/", handlers.StudentsHanlder)
+	mux.HandleFunc("GET /teachers/{id}/students", handlers.GetStudentsByTeacherID)
 
-	mux.HandleFunc("/execs/", handlers.ExecsHandler)
+	mux.HandleFunc("GET /students", handlers.GetAllStudentsHandler)
+	mux.HandleFunc("POST /students", handlers.AddStudentHandler)
+
+	mux.HandleFunc("GET /students/{id}", handlers.GetStudentHandler)
+	mux.HandleFunc("PATCH /students/{id}", handlers.UpdateStudentHandler)
+
+	mux.HandleFunc("/execs", handlers.ExecsHandler)
 
 	fmt.Println("The Server is running on Port : ", port)
 
